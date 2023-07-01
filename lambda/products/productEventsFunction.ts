@@ -24,7 +24,7 @@ export async function handler(event: ProductEvent, context: Context, callback: C
     console.log(`Lambda requestId: ${context.awsRequestId}`)
 
     const dynamoDbHandler = new DynamoDbHandler()
-    await dynamoDbHandler.createEvent(event)
+    dynamoDbHandler.createEvent(event)
 
     callback(null, JSON.stringify({
         productEventCreated: true,

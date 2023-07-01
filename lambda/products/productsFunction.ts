@@ -90,9 +90,12 @@ class ApiGatewayHandler {
     }
 
     async createProduct(product: Product) {
-        const createdProduct = await this.dynamoDbHandler.createProduct(product);
-        await this.productEventHandler.sendProductEvent(createdProduct, ProductEventType.CREATED, "alexander@inatel.br", this.lambdaRequestId)
-        return this.createResponse(201, createdProduct);
+        product.id = uuid();
+        // Execute the two promises in parallel (create product and send product event)
+        const createPromise = this.dynamoDbHandler.createProduct(product);
+        const sendProductPromise = this.productEventHandler.sendProductEvent(product, ProductEventType.CREATED, "alexander@inatel.br", this.lambdaRequestId)
+        await Promise.all([createPromise, sendProductPromise])
+        return this.createResponse(201, product);
     }
 
     async getAllProducts() {
@@ -172,8 +175,6 @@ class DynamoDbHandler {
     }
 
     async createProduct(product: Product): Promise<Product> {
-        product.id = uuid()
-
         await this.ddbClient.put({
             TableName: this.productsDdb,
             Item: product
