@@ -208,7 +208,7 @@ class DynamoDbHandler {
             },
             ConditionExpression: 'attribute_exists(id)',
             ReturnValues: 'UPDATED_NEW',
-            UpdateExpression: "set productName = :n, code = :c, price = :p, model = :m",
+            UpdateExpression: "set productName = :n, code = :c, price = :p, model = :m, productUrl = :u",
             ExpressionAttributeValues: {
                 ":n": product.productName,
                 ":c": product.code,
