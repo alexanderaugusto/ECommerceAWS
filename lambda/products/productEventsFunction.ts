@@ -42,7 +42,7 @@ class DynamoDbHandler {
 
     createEvent(event: ProductEvent) {
         const timestamp = Date.now()
-        const ttl = ~~(timestamp / 1000 + 5 * 60) // 5 minutes in the future
+        const ttl = ~~(timestamp + ( 1000 + 5 * 60)) // 5 minutes in the future
 
         return this.ddbClient.put({
             TableName: this.eventsDdb,

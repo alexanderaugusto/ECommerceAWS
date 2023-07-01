@@ -123,7 +123,7 @@ class ApiGatewayHandler {
     async deleteProduct(productId: string) {
         try {
             const productDeleted = await this.dynamoDbHandler.deleteProduct(productId);
-            await this.productEventHandler.sendProductEvent(productDeleted, ProductEventType.UPDATED, "alexander@inatel.br", this.lambdaRequestId)
+            await this.productEventHandler.sendProductEvent(productDeleted, ProductEventType.DELETED, "alexander@inatel.br", this.lambdaRequestId)
             return this.createResponse(200, productDeleted);
         } catch (error) {
             console.error((<Error>error).message)
