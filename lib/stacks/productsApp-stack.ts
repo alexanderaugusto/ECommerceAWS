@@ -2,33 +2,33 @@
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodeJS from "aws-cdk-lib/aws-lambda-nodejs";
-import { Construct } from 'constructs';
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
-
+import { Construct } from 'constructs';
 interface ProductsAppStackProps extends cdk.StackProps {
     productEventsFunction: lambdaNodeJS.NodejsFunction,
 }
 
 export class ProductsAppStack extends cdk.Stack {
     readonly handler: lambdaNodeJS.NodejsFunction; // lambda function handler for this stack
+    readonly productsDdb: dynamodb.Table // DynamoDB table for this stack
 
     constructor(scope: Construct, id: string, props: ProductsAppStackProps) {
         super(scope, id, props); // call the parent constructor
 
         // create a DynamoDB table
-        const productsDdb = this.createDynamoDBTable();
+        this.productsDdb = this.createDynamoDBTable();
 
         // create a lambda function
-        this.handler = this.createProductsFunction(productsDdb, props);
+        this.handler = this.createProductsFunction(props);
 
         // grant the lambda function read/write access to the DynamoDB table
-        productsDdb.grantReadWriteData(this.handler);
+        this.productsDdb.grantReadWriteData(this.handler);
 
         // grant the lambda function invoke access to the lambda function
         props.productEventsFunction.grantInvoke(this.handler);
     }
 
-    createProductsFunction(productsDdb: dynamodb.Table, props: ProductsAppStackProps) {
+    createProductsFunction(props: ProductsAppStackProps) {
         // scope: Construct - the parent construct
         // id: string - the logical ID of the construct within the parent construct
         // props?: StackProps - stack properties
@@ -43,7 +43,7 @@ export class ProductsAppStack extends cdk.Stack {
             memorySize: 128, // memory allocatted to the lamda function in MB at AWS
             timeout: cdk.Duration.seconds(10), // maximum execution time of the lambda function at AWS
             environment: { // environment variables
-                PRODUCTS_DDB: productsDdb.tableName, // name of the DynamoDB table
+                PRODUCTS_DDB: this.productsDdb.tableName, // name of the DynamoDB table
                 PRODUCT_EVENTS_FUNCTION_NAME: props.productEventsFunction.functionName, // name of the lambda function
             },
             tracing: lambda.Tracing.ACTIVE,

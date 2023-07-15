@@ -7,7 +7,8 @@ import * as cwlogs from "aws-cdk-lib/aws-logs";
 
 // Purpose: Defines the properties for the ECommerceApiStack class.
 interface ECommerceApiStackProps extends cdk.StackProps {
-    productsHandler: lambdaNodeJS.NodejsFunction // lambda function handler for the products function
+    productsHandler: lambdaNodeJS.NodejsFunction, // lambda function handler for the products function
+    ordersHandler: lambdaNodeJS.NodejsFunction, // lambda function handler for the orders function
 }
 
 export class ECommerceApiStack extends cdk.Stack {
@@ -22,7 +23,8 @@ export class ECommerceApiStack extends cdk.Stack {
         // create the API Gateway
         const api = this.createApiGateway();
 
-        this.integrateLambdaFunctionWithApiGateway(api, props.productsHandler); // integrate the products function with the API Gateway
+        this.integrateProductsLambdaFunctionWithApiGateway(api, props.productsHandler); // integrate the products function with the API Gateway
+        this.integrateOrdersLambdaFunctionWithApiGateway(api, props.ordersHandler); // integrate the orders function with the API Gateway
 
         // create an output for the URL of the API Gateway
         this.urlOutput = new cdk.CfnOutput(this, "url", {
@@ -55,12 +57,17 @@ export class ECommerceApiStack extends cdk.Stack {
         });
     }
 
-    integrateLambdaFunctionWithApiGateway(api: apigateway.RestApi, lambdaFunction: lambdaNodeJS.NodejsFunction) {
+    integrateProductsLambdaFunctionWithApiGateway(api: apigateway.RestApi, lambdaFunction: lambdaNodeJS.NodejsFunction) {
         const productsFunctionIntegration = new apigateway.LambdaIntegration(lambdaFunction); // create an integration for the products function
-        this.createApiResources(api, productsFunctionIntegration);
+        this.createProductsApiResources(api, productsFunctionIntegration);
     }
 
-    createApiResources(api: apigateway.RestApi, productsFunctionIntegration: cdk.aws_apigateway.LambdaIntegration) {
+    integrateOrdersLambdaFunctionWithApiGateway(api: apigateway.RestApi, lambdaFunction: lambdaNodeJS.NodejsFunction) {
+        const ordersFunctionIntegration = new apigateway.LambdaIntegration(lambdaFunction); // create an integration for the orders function
+        this.createOrdersApiResources(api, ordersFunctionIntegration);
+    }
+
+    createProductsApiResources(api: apigateway.RestApi, productsFunctionIntegration: cdk.aws_apigateway.LambdaIntegration) {
         const productsResource = api.root.addResource("products"); // create a resource for the products function
         productsResource.addMethod("POST", productsFunctionIntegration); // add a POST method to the products resource
         productsResource.addMethod("GET", productsFunctionIntegration); // add a GET method to the products resource
@@ -69,5 +76,12 @@ export class ECommerceApiStack extends cdk.Stack {
         productIdResource.addMethod("GET", productsFunctionIntegration); // add a GET method to the product resource
         productIdResource.addMethod("PUT", productsFunctionIntegration); // add a PUT method to the product resource
         productIdResource.addMethod("DELETE", productsFunctionIntegration); // add a DELETE method to the product resource
+    }
+
+    createOrdersApiResources(api: apigateway.RestApi, ordersFunctionIntegration: cdk.aws_apigateway.LambdaIntegration) {
+        const ordersResource = api.root.addResource("orders"); // create a resource for the orders function
+        ordersResource.addMethod("POST", ordersFunctionIntegration); // add a POST method to the orders resource
+        ordersResource.addMethod("GET", ordersFunctionIntegration); // add a GET method to the orders resource
+        ordersResource.addMethod("DELETE", ordersFunctionIntegration); // add a GET method to the orders resource
     }
 }
