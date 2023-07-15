@@ -178,17 +178,8 @@ class ApiGatewayHandler {
 
     async deleteOrder(queryStringParameters: APIGatewayProxyEventQueryStringParameters | null) {
         try {
-            if (queryStringParameters && queryStringParameters.email && queryStringParameters.orderId) {
-                await this.dynamoDbHandler.deleteOrder(queryStringParameters.email, queryStringParameters.orderId)
-                return this.createResponse(204, null);
-            }
-            else {
-                return this.createResponse(400, {
-                    message: "Bad request",
-                    ApiGwRequestId: this.apiRequestId,
-                    LambdaRequestId: this.lambdaRequestId,
-                });
-            }
+            await this.dynamoDbHandler.deleteOrder(queryStringParameters!.email!, queryStringParameters!.orderId!)
+            return this.createResponse(204, null);
         }
         catch (error) {
             console.log((<Error>error).message)
