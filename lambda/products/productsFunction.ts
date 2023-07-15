@@ -109,7 +109,11 @@ class ApiGatewayHandler {
             return this.createResponse(200, product);
         } catch (error) {
             console.error((<Error>error).message)
-            return this.createResponse(404, (<Error>error).message);
+            return this.createResponse(404, {
+                message: (<Error>error).message,
+                ApiGwRequestId: this.apiRequestId,
+                LambdaRequestId: this.lambdaRequestId
+            });
         }
     }
 
@@ -119,7 +123,11 @@ class ApiGatewayHandler {
             await this.productEventHandler.sendProductEvent(productUpdated, ProductEventType.UPDATED, "alexander@inatel.br", this.lambdaRequestId)
             return this.createResponse(200, productUpdated);
         } catch (ConditionalCheckFailedException) {
-            return this.createResponse(404, 'Product not found');
+            return this.createResponse(404, {
+                message: "Product not found",
+                ApiGwRequestId: this.apiRequestId,
+                LambdaRequestId: this.lambdaRequestId
+            });
         }
     }
 
@@ -127,10 +135,14 @@ class ApiGatewayHandler {
         try {
             const productDeleted = await this.dynamoDbHandler.deleteProduct(productId);
             await this.productEventHandler.sendProductEvent(productDeleted, ProductEventType.DELETED, "alexander@inatel.br", this.lambdaRequestId)
-            return this.createResponse(200, productDeleted);
+            return this.createResponse(204, null);
         } catch (error) {
             console.error((<Error>error).message)
-            return this.createResponse(404, (<Error>error).message);
+            return this.createResponse(404, {
+                message: (<Error>error).message,
+                ApiGwRequestId: this.apiRequestId,
+                LambdaRequestId: this.lambdaRequestId
+            });
         }
     }
 

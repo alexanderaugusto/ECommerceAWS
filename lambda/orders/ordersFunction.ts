@@ -136,7 +136,7 @@ class ApiGatewayHandler {
             return this.createResponse(404, {
                 message: "Some product was not found",
                 ApiGwRequestId: this.apiRequestId,
-                LambdaRequestId: this.lambdaRequestId,
+                LambdaRequestId: this.lambdaRequestId
             });
         }
     }
@@ -171,7 +171,7 @@ class ApiGatewayHandler {
             return this.createResponse(404, {
                 message: (<Error>error).message,
                 ApiGwRequestId: this.apiRequestId,
-                LambdaRequestId: this.lambdaRequestId,
+                LambdaRequestId: this.lambdaRequestId
             });
         }
     }
@@ -196,7 +196,7 @@ class ApiGatewayHandler {
             return this.createResponse(404, {
                 message: (<Error>error).message,
                 ApiGwRequestId: this.apiRequestId,
-                LambdaRequestId: this.lambdaRequestId,
+                LambdaRequestId: this.lambdaRequestId
             });
         }
     }
