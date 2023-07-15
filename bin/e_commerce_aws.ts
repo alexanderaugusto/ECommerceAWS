@@ -35,16 +35,19 @@ productEventsFunctionStack.addDependency(eventsDdbStack)
 const productsAppStack = new ProductsAppStack(app, "ProductsApp", {
   tags: tags,
   env: env,
-  productEventsFunction: productEventsFunctionStack.handler
+  productEventsFunction: productEventsFunctionStack.handler,
+  eventsDdb: eventsDdbStack.table
 })
 productsAppStack.addDependency(productEventsFunctionStack)
 
 const ordersApplicationStack = new OrdersApplicationStack(app, "OrderApp", {
   productsDdb: productsAppStack.productsDdb,
+  eventsDdb: eventsDdbStack.table,
   env: env,
   tags: tags
 })
 ordersApplicationStack.addDependency(productsAppStack)
+ordersApplicationStack.addDependency(eventsDdbStack)
 
 const eCommerceApiStack = new ECommerceApiStack(app, "ECommerceApi", {
   productsHandler: productsAppStack.handler,

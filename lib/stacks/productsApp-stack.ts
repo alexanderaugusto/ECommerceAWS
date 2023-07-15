@@ -4,8 +4,11 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodeJS from "aws-cdk-lib/aws-lambda-nodejs";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Construct } from 'constructs';
+import * as iam from "aws-cdk-lib/aws-iam";
+
 interface ProductsAppStackProps extends cdk.StackProps {
     productEventsFunction: lambdaNodeJS.NodejsFunction,
+    eventsDdb: dynamodb.Table
 }
 
 export class ProductsAppStack extends cdk.Stack {
@@ -20,6 +23,8 @@ export class ProductsAppStack extends cdk.Stack {
 
         // create a lambda function
         this.handler = this.createProductsFunction(props);
+
+        this.addPolicyToLambdaFunction(this.handler, props);
 
         // grant the lambda function read/write access to the DynamoDB table
         this.productsDdb.grantReadWriteData(this.handler);
@@ -66,5 +71,19 @@ export class ProductsAppStack extends cdk.Stack {
         });
 
         return productsDdb;
+    }
+
+    addPolicyToLambdaFunction(productEventsHandler: lambdaNodeJS.NodejsFunction, props: ProductsAppStackProps) {
+        const eventsDdbPolicy = new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ["dynamodb:PutItem"],
+            resources: [props.eventsDdb.tableArn],
+            conditions: {
+                ['ForAllValues:StringLike']: {
+                    'dynamodb:LeadingKeys': ['#product_*']
+                }
+            }
+        })
+        productEventsHandler.addToRolePolicy(eventsDdbPolicy);
     }
 }

@@ -2,6 +2,7 @@ import { APIGatewayProxyEvent, APIGatewayProxyEventQueryStringParameters, APIGat
 import { DocumentClient } from "aws-sdk/clients/dynamodb";
 import { v4 as uuid } from "uuid";
 import * as AWSXRay from "aws-xray-sdk";
+import { SNS } from "aws-sdk";
 
 AWSXRay.captureAWS(require("aws-sdk"))
 
@@ -80,6 +81,26 @@ export interface Product {
     productUrl: string;
 }
 
+export interface OrderEvent {
+    email: string;
+    orderId: string;
+    shipping: {
+        type: string;
+        carrier: string;
+    },
+    billing: {
+        payment: string;
+        totalPrice: number;
+    },
+    productCodes: string[];
+    requestId: string;
+}
+
+export enum OrderEventType {
+    CREATED = "ORDER_CREATED",
+    DELETED = "ORDER_DELETED"
+}
+
 export async function handler(event: APIGatewayProxyEvent, context: Context): Promise<APIGatewayProxyResult> {
     const handler = new ApiGatewayHandler(event, context);
     return await handler.handler();
@@ -90,12 +111,14 @@ class ApiGatewayHandler {
     private apiRequestId: string;
     private lambdaRequestId: string;
     private dynamoDbHandler;
+    private orderEventHandler;
 
     constructor(private event: APIGatewayProxyEvent, private context: Context) {
         this.method = event.httpMethod;
         this.apiRequestId = event.requestContext.requestId;
         this.lambdaRequestId = context.awsRequestId;
         this.dynamoDbHandler = new DynamoDbHandler();
+        this.orderEventHandler = new OrderEventHandler();
     }
 
     async handler() {
@@ -130,6 +153,10 @@ class ApiGatewayHandler {
         if (products.length == orderRequest.productIds.length) {
             const order = this.buildOrder(orderRequest, products)
             const orderCreated = await this.dynamoDbHandler.createOrder(order)
+
+            const eventResult = await this.orderEventHandler.sendOrderEvent(orderCreated, OrderEventType.CREATED, this.lambdaRequestId);
+            console.log(`Order created event sent - OrderId: ${orderCreated.sk} - MessageId: ${eventResult.MessageId}`);
+
             return this.createResponse(201, this.convertToOrderResponse(orderCreated))
         }
         else {
@@ -178,7 +205,11 @@ class ApiGatewayHandler {
 
     async deleteOrder(queryStringParameters: APIGatewayProxyEventQueryStringParameters | null) {
         try {
-            await this.dynamoDbHandler.deleteOrder(queryStringParameters!.email!, queryStringParameters!.orderId!)
+            const orderDeleted = await this.dynamoDbHandler.deleteOrder(queryStringParameters!.email!, queryStringParameters!.orderId!)
+
+            const eventResult = await this.orderEventHandler.sendOrderEvent(orderDeleted, OrderEventType.DELETED, this.lambdaRequestId);
+            console.log(`Order deleted event sent - OrderId: ${orderDeleted.sk} - MessageId: ${eventResult.MessageId}`);
+
             return this.createResponse(204, null);
         }
         catch (error) {
@@ -349,5 +380,42 @@ class DynamoDbHandler {
         }).promise()
 
         return data.Responses![this.productsDdb] as Product[]
+    }
+}
+
+class OrderEventHandler {
+    private snsClient;
+    private orderEventsTopicArn = process.env.ORDER_EVENTS_TOPIC_ARN!
+
+    constructor() {
+        this.snsClient = new SNS();
+    }
+
+    sendOrderEvent(order: Order, eventType: OrderEventType, lambdaRequestId: string) {
+        const productCodes: string[] = []
+
+        order.products?.forEach((product) => {
+            productCodes.push(product.code)
+        })
+
+        const orderEvent: OrderEvent = {
+            email: order.pk,
+            orderId: order.sk!,
+            billing: order.billing,
+            shipping: order.shipping,
+            requestId: lambdaRequestId,
+            productCodes: productCodes
+        }
+
+        return this.snsClient.publish({
+            TopicArn: this.orderEventsTopicArn,
+            Message: JSON.stringify(orderEvent),
+            MessageAttributes: {
+                eventType: {
+                    DataType: "String",
+                    StringValue: eventType
+                }
+            }
+        }).promise()
     }
 }
