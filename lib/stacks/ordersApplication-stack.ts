@@ -6,6 +6,8 @@ import { Construct } from 'constructs';
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as subs from "aws-cdk-lib/aws-sns-subscriptions";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as sqs from "aws-cdk-lib/aws-sqs"
+import * as lambdaEventSource from "aws-cdk-lib/aws-lambda-event-sources";
 
 interface OrdersApplicationStackProps extends cdk.StackProps {
     productsDdb: dynamodb.Table,
@@ -29,6 +31,9 @@ export class OrdersApplicationStack extends cdk.Stack {
 
         // create a lambda function for order events
         const orderEventsHandler = this.createOrdersEventFunction(props);
+
+        // create a lambda function for order emails
+        const orderEmailsHandler = this.createOrderEmailsFunction();
 
         // create a lambda function for billing
         const billingHandler = this.createBillingFunction();
@@ -55,6 +60,25 @@ export class OrdersApplicationStack extends cdk.Stack {
                 }),
             },
         }));
+
+        const orderEventsQueue = this.createOrderEventsQueue(); // create an SQS queue
+
+        // add a subscription to the SNS topic for the SQS queue
+        ordersTopic.addSubscription(new subs.SqsSubscription(orderEventsQueue, {
+            filterPolicy: {
+                eventType: sns.SubscriptionFilter.stringFilter({
+                    allowlist: ["ORDER_CREATED"],
+                }),
+            },
+        }));
+
+        // Configure the order events lambda function as an event source for the SQS queue
+        orderEmailsHandler.addEventSource(new lambdaEventSource.SqsEventSource(orderEventsQueue, {
+                batchSize: 5,
+                enabled: true,
+                maxBatchingWindow: cdk.Duration.minutes(1)
+            }));
+        orderEventsQueue.grantConsumeMessages(orderEmailsHandler);
     }
 
     createDynamoDBTable(): dynamodb.Table {
@@ -118,6 +142,23 @@ export class OrdersApplicationStack extends cdk.Stack {
         );
     }
 
+    createOrderEmailsFunction() {
+        return new lambdaNodeJS.NodejsFunction(this, "OrderEmailsFunction",
+            {
+                functionName: "OrderEmailsFunction",
+                entry: "lambda/orders/orderEmailsFunction.ts",
+                handler: "handler",
+                bundling: {
+                    minify: false,
+                    sourceMap: false,
+                },
+                tracing: lambda.Tracing.ACTIVE,
+                memorySize: 128,
+                timeout: cdk.Duration.seconds(30),
+                insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_143_0
+            });
+    }
+
     createBillingFunction() {
         return new lambdaNodeJS.NodejsFunction(this, "BillingFunction.ts", {
             functionName: "BillingFunction",
@@ -153,5 +194,26 @@ export class OrdersApplicationStack extends cdk.Stack {
             }
         })
         orderEventsHandler.addToRolePolicy(eventsDdbPolicy);
+    }
+
+    createOrderEventsQueue(): sqs.Queue {
+        const orderEventsDlq = new sqs.Queue(this, "OrderEventsDlq", {
+            queueName: "order-events-dlq",
+            enforceSSL: false,
+            encryption: sqs.QueueEncryption.UNENCRYPTED,
+            retentionPeriod: cdk.Duration.days(10)
+        })
+
+        const orderEventsQueue = new sqs.Queue(this, "OrderEventsQueue", {
+            queueName: "order-events",
+            enforceSSL: false,
+            encryption: sqs.QueueEncryption.UNENCRYPTED,
+            deadLetterQueue: {
+                maxReceiveCount: 3,
+                queue: orderEventsDlq
+            }
+        })
+
+        return orderEventsQueue;
     }
 }
