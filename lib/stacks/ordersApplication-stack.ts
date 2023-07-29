@@ -16,6 +16,7 @@ interface OrdersApplicationStackProps extends cdk.StackProps {
 
 export class OrdersApplicationStack extends cdk.Stack {
     readonly handler: lambdaNodeJS.NodejsFunction;
+    readonly orderEventsFetchHandler: lambdaNodeJS.NodejsFunction;
 
     constructor(scope: Construct, id: string, props: OrdersApplicationStackProps) {
         super(scope, id, props);
@@ -29,6 +30,8 @@ export class OrdersApplicationStack extends cdk.Stack {
         const orderEventsHandler = this.createOrdersEventFunction(props);
 
         const orderEmailsHandler = this.createOrderEmailsFunction();
+
+        this.orderEventsFetchHandler = this.createOrderEventsFetchFunction(props);
 
         const billingHandler = this.createBillingFunction();
 
@@ -55,17 +58,24 @@ export class OrdersApplicationStack extends cdk.Stack {
         ordersTopic.addSubscription(new subs.SqsSubscription(orderEventsQueue, {
             filterPolicy: {
                 eventType: sns.SubscriptionFilter.stringFilter({
-                    allowlist: ["ORDER_CREATED"],
+                    allowlist: ["ORDER_CREATED", "ORDER_DELETED"],
                 }),
             },
         }));
 
         orderEmailsHandler.addEventSource(new lambdaEventSource.SqsEventSource(orderEventsQueue, {
-                batchSize: 5,
-                enabled: true,
-                maxBatchingWindow: cdk.Duration.minutes(1)
-            }));
+            batchSize: 5,
+            enabled: true,
+            maxBatchingWindow: cdk.Duration.minutes(1)
+        }));
         orderEventsQueue.grantConsumeMessages(orderEmailsHandler);
+
+        const eventsFetchDdbPolicy = new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ['dynamodb:Query'],
+            resources: [`${props.eventsDdb.tableArn}/index/emailIdx`],
+        })
+        this.orderEventsFetchHandler.addToRolePolicy(eventsFetchDdbPolicy)
     }
 
     createDynamoDBTable(): dynamodb.Table {
@@ -143,6 +153,26 @@ export class OrdersApplicationStack extends cdk.Stack {
                 timeout: cdk.Duration.seconds(30),
                 insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_143_0
             });
+    }
+
+    createOrderEventsFetchFunction(props: OrdersApplicationStackProps) {
+        return new lambdaNodeJS.NodejsFunction(this,
+            'OrderEventsFetchFunction', {
+            functionName: 'OrderEventsFetchFunction',
+            entry: 'lambda/orders/orderEventsFetchFunction.ts',
+            handler: 'handler',
+            bundling: {
+                minify: false,
+                sourceMap: false,
+            },
+            tracing: lambda.Tracing.ACTIVE,
+            memorySize: 128,
+            timeout: cdk.Duration.seconds(30),
+            insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_143_0,
+            environment: {
+                EVENTS_DDB: props.eventsDdb.tableName,
+            },
+        });
     }
 
     createBillingFunction() {

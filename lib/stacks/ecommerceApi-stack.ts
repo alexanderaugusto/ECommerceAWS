@@ -8,6 +8,7 @@ import * as cwlogs from "aws-cdk-lib/aws-logs";
 interface ECommerceApiStackProps extends cdk.StackProps {
     productsHandler: lambdaNodeJS.NodejsFunction,
     ordersHandler: lambdaNodeJS.NodejsFunction,
+    orderEventsFetchHandler: lambdaNodeJS.NodejsFunction
 }
 
 export class ECommerceApiStack extends cdk.Stack {
@@ -19,7 +20,8 @@ export class ECommerceApiStack extends cdk.Stack {
         const api = this.createApiGateway();
 
         this.integrateProductsLambdaFunctionWithApiGateway(api, props.productsHandler);
-        this.integrateOrdersLambdaFunctionWithApiGateway(api, props.ordersHandler);
+        this.integrateOrdersLambdaFunctionWithApiGateway(api, props.ordersHandler, props.orderEventsFetchHandler);
+
         this.urlOutput = new cdk.CfnOutput(this, "url", {
             exportName: "url",
             value: api.url,
@@ -55,9 +57,11 @@ export class ECommerceApiStack extends cdk.Stack {
         this.createProductsApiResources(api, productsFunctionIntegration);
     }
 
-    integrateOrdersLambdaFunctionWithApiGateway(api: apigateway.RestApi, lambdaFunction: lambdaNodeJS.NodejsFunction) {
+    integrateOrdersLambdaFunctionWithApiGateway(api: apigateway.RestApi, lambdaFunction: lambdaNodeJS.NodejsFunction, orderEventsLambdaFunction: lambdaNodeJS.NodejsFunction) {
         const ordersFunctionIntegration = new apigateway.LambdaIntegration(lambdaFunction);
-        this.createOrdersApiResources(api, ordersFunctionIntegration);
+        const orderEventsFunctionIntegration = new apigateway.LambdaIntegration(orderEventsLambdaFunction);
+
+        this.createOrdersApiResources(api, ordersFunctionIntegration, orderEventsFunctionIntegration);
     }
 
     createProductsApiResources(api: apigateway.RestApi, productsFunctionIntegration: cdk.aws_apigateway.LambdaIntegration) {
@@ -71,11 +75,18 @@ export class ECommerceApiStack extends cdk.Stack {
         productIdResource.addMethod("DELETE", productsFunctionIntegration);
     }
 
-    createOrdersApiResources(api: apigateway.RestApi, ordersFunctionIntegration: cdk.aws_apigateway.LambdaIntegration) {
+    createOrdersApiResources(api: apigateway.RestApi, ordersFunctionIntegration: cdk.aws_apigateway.LambdaIntegration, orderEventsFunctionIntegration: cdk.aws_apigateway.LambdaIntegration) {
         const ordersResource = api.root.addResource("orders");
         ordersResource.addMethod("POST", ordersFunctionIntegration, this.addCreateOrderValidator(api));
         ordersResource.addMethod("GET", ordersFunctionIntegration);
         ordersResource.addMethod("DELETE", ordersFunctionIntegration, this.addDeleteOrderValidator());
+
+        this.createOrderEventsApiResources(ordersResource, orderEventsFunctionIntegration);
+    }
+
+    createOrderEventsApiResources(ordersResource: apigateway.Resource, orderEventsFunctionIntegration: cdk.aws_apigateway.LambdaIntegration) {
+        const orderEventsResource = ordersResource.addResource('events');
+        orderEventsResource.addMethod("GET", orderEventsFunctionIntegration);
     }
 
     addProductValidator(api: apigateway.RestApi, validatorName: string, modelName: string, requestValidatorName: string) {

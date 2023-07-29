@@ -10,7 +10,9 @@ export class EventsDdbStack extends cdk.Stack {
 
         this.table = this.createDynamoDBTable();
 
-        this.enableAutoScaling(this.table);
+        // this.enableAutoScaling(this.table);
+
+        this.addGlobalSecondaryIndex(this.table);
     }
 
     createDynamoDBTable(): dynamodb.Table {
@@ -26,9 +28,9 @@ export class EventsDdbStack extends cdk.Stack {
                 type: dynamodb.AttributeType.STRING,
             },
             timeToLiveAttribute: "ttl",
-            billingMode: dynamodb.BillingMode.PROVISIONED,
-            readCapacity: 1,
-            writeCapacity: 1,
+            billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+            // readCapacity: 1,
+            // writeCapacity: 1,
         });
 
         return eventsDdb;
@@ -55,6 +57,21 @@ export class EventsDdbStack extends cdk.Stack {
             targetUtilizationPercent: 50,
             scaleInCooldown: cdk.Duration.seconds(60),
             scaleOutCooldown: cdk.Duration.seconds(60),
+        });
+    }
+
+    addGlobalSecondaryIndex(table: dynamodb.Table): void {
+        table.addGlobalSecondaryIndex({
+            indexName: "emailIdx",
+            partitionKey: {
+                name: "email",
+                type: dynamodb.AttributeType.STRING,
+            },
+            sortKey: {
+                name: "sk",
+                type: dynamodb.AttributeType.STRING,
+            },
+            projectionType: dynamodb.ProjectionType.ALL,
         });
     }
 }
