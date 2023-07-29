@@ -1,88 +1,81 @@
-// Purpose: Defines the ECommerceApiStack class. This class is used to create the API Gateway and Lambda functions for the ECommerce service.
+
 import * as cdk from 'aws-cdk-lib';
 import * as lambdaNodeJS from "aws-cdk-lib/aws-lambda-nodejs"
 import { Construct } from 'constructs';
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as cwlogs from "aws-cdk-lib/aws-logs";
 
-// Purpose: Defines the properties for the ECommerceApiStack class.
 interface ECommerceApiStackProps extends cdk.StackProps {
-    productsHandler: lambdaNodeJS.NodejsFunction, // lambda function handler for the products function
-    ordersHandler: lambdaNodeJS.NodejsFunction, // lambda function handler for the orders function
+    productsHandler: lambdaNodeJS.NodejsFunction,
+    ordersHandler: lambdaNodeJS.NodejsFunction,
 }
 
 export class ECommerceApiStack extends cdk.Stack {
-    public readonly urlOutput: cdk.CfnOutput; // the URL of the API Gateway
+    public readonly urlOutput: cdk.CfnOutput;
 
-    // scope: Construct - the parent construct
-    // id: string - the logical ID of the construct within the parent construct
-    // props: ECommerceApiStackProps - stack properties
     constructor(scope: Construct, id: string, props: ECommerceApiStackProps) {
         super(scope, id, props);
 
-        // create the API Gateway
         const api = this.createApiGateway();
 
-        this.integrateProductsLambdaFunctionWithApiGateway(api, props.productsHandler); // integrate the products function with the API Gateway
-        this.integrateOrdersLambdaFunctionWithApiGateway(api, props.ordersHandler); // integrate the orders function with the API Gateway
-
-        // create an output for the URL of the API Gateway
+        this.integrateProductsLambdaFunctionWithApiGateway(api, props.productsHandler);
+        this.integrateOrdersLambdaFunctionWithApiGateway(api, props.ordersHandler);
         this.urlOutput = new cdk.CfnOutput(this, "url", {
-            exportName: "url", // name of the output
-            value: api.url, // value of the output
+            exportName: "url",
+            value: api.url,
         });
     }
 
     createApiGateway() {
-        const logGroup = new cwlogs.LogGroup(this, "ECommerceApiLogs"); // create a log group for the API Gateway
+        const logGroup = new cwlogs.LogGroup(this, "ECommerceApiLogs");
 
         return new apigateway.RestApi(this, "ecommerce-api", {
-            restApiName: "ECommerce Service", // name of the API Gateway at AWS
-            description: "This is the ECommerce service", // description of the API Gateway at AWS
-            cloudWatchRole: true, // create a CloudWatch role for API Gateway
-            deployOptions: { // deployment options
-                accessLogDestination: new apigateway.LogGroupLogDestination(logGroup), // log group for the API Gateway
-                accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields({ // log format
-                    caller: true, // log the caller. true: log the caller - false: do not log the caller
-                    httpMethod: true, // log the HTTP method. true: log the HTTP method - false: do not log the HTTP method
-                    ip: true, // log the IP address. true: log the IP address - false: do not log the IP address
-                    protocol: true, // log the protocol. true: log the protocol - false: do not log the protocol
-                    requestTime: true, // log the request time. true: log the request time - false: do not log the request time
-                    resourcePath: true, // log the resource path. true: log the resource path - false: do not log the resource path
-                    responseLength: true, // log the response length. true: log the response length - false: do not log the response length
-                    status: true, // log the status. true: log the status - false: do not log the status
-                    user: true, // log the user. true: log the user - false: do not log the user
+            restApiName: "ECommerce Service",
+            description: "This is the ECommerce service",
+            cloudWatchRole: true,
+            deployOptions: {
+                accessLogDestination: new apigateway.LogGroupLogDestination(logGroup),
+                accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields({
+                    caller: true,
+                    httpMethod: true,
+                    ip: true,
+                    protocol: true,
+                    requestTime: true,
+                    resourcePath: true,
+                    responseLength: true,
+                    status: true,
+                    user: true,
                 }),
             },
         });
     }
 
     integrateProductsLambdaFunctionWithApiGateway(api: apigateway.RestApi, lambdaFunction: lambdaNodeJS.NodejsFunction) {
-        const productsFunctionIntegration = new apigateway.LambdaIntegration(lambdaFunction); // create an integration for the products function
+        const productsFunctionIntegration = new apigateway.LambdaIntegration(lambdaFunction);
         this.createProductsApiResources(api, productsFunctionIntegration);
     }
 
     integrateOrdersLambdaFunctionWithApiGateway(api: apigateway.RestApi, lambdaFunction: lambdaNodeJS.NodejsFunction) {
-        const ordersFunctionIntegration = new apigateway.LambdaIntegration(lambdaFunction); // create an integration for the orders function
+        const ordersFunctionIntegration = new apigateway.LambdaIntegration(lambdaFunction);
         this.createOrdersApiResources(api, ordersFunctionIntegration);
     }
 
     createProductsApiResources(api: apigateway.RestApi, productsFunctionIntegration: cdk.aws_apigateway.LambdaIntegration) {
-        const productsResource = api.root.addResource("products"); // create a resource for the products function
-        productsResource.addMethod("POST", productsFunctionIntegration, this.addProductValidator(api, "ProductCreateRequestValidator", "CreateProductModel", "Product create request validator")); // add a POST method to the products resource
-        productsResource.addMethod("GET", productsFunctionIntegration); // add a GET method to the products resource
+        const productsResource = api.root.addResource("products");
+        productsResource.addMethod("POST", productsFunctionIntegration, this.addProductValidator(api, "ProductCreateRequestValidator", "CreateProductModel", "Product create request validator"));
+        productsResource.addMethod("GET", productsFunctionIntegration);
 
-        const productIdResource = productsResource.addResource("{id}"); // create a resource for the product function
-        productIdResource.addMethod("GET", productsFunctionIntegration); // add a GET method to the product resource
-        productIdResource.addMethod("PUT", productsFunctionIntegration, this.addProductValidator(api, "ProductUpdateRequestValidator", "UpdateProductModel", "Product update request validator")); // add a PUT method to the product resource
-        productIdResource.addMethod("DELETE", productsFunctionIntegration); // add a DELETE method to the product resource
+        const productIdResource = productsResource.addResource("{id}");
+        productIdResource.addMethod("GET", productsFunctionIntegration);
+        productIdResource.addMethod("PUT", productsFunctionIntegration, this.addProductValidator(api, "ProductUpdateRequestValidator", "UpdateProductModel", "Product update request validator"));
+        productIdResource.addMethod("DELETE", productsFunctionIntegration);
     }
 
     createOrdersApiResources(api: apigateway.RestApi, ordersFunctionIntegration: cdk.aws_apigateway.LambdaIntegration) {
-        const ordersResource = api.root.addResource("orders"); // create a resource for the orders function
-        ordersResource.addMethod("POST", ordersFunctionIntegration, this.addCreateOrderValidator(api)); // add a POST method to the orders resource
-        ordersResource.addMethod("GET", ordersFunctionIntegration); // add a GET method to the orders resource
-        ordersResource.addMethod("DELETE", ordersFunctionIntegration, this.addDeleteOrderValidator()); // add a GET method to the orders resource
+        const ordersResource = api.root.addResource("orders");
+        ordersResource.addMethod("POST", ordersFunctionIntegration, this.addCreateOrderValidator(api));
+        ordersResource.addMethod("GET", ordersFunctionIntegration);
+        ordersResource.addMethod("DELETE", ordersFunctionIntegration, this.addDeleteOrderValidator());
     }
 
     addProductValidator(api: apigateway.RestApi, validatorName: string, modelName: string, requestValidatorName: string) {

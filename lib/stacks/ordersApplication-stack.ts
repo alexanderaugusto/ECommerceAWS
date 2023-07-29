@@ -20,39 +20,28 @@ export class OrdersApplicationStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props: OrdersApplicationStackProps) {
         super(scope, id, props);
 
-        // create a DynamoDB table
         const ordersDdb = this.createDynamoDBTable();
 
-        // create a SNS topic
         const ordersTopic = this.createSnsTopic();
 
-        // create a lambda function
         this.handler = this.createOrdersFunction(ordersDdb, ordersTopic, props);
 
-        // create a lambda function for order events
         const orderEventsHandler = this.createOrdersEventFunction(props);
 
-        // create a lambda function for order emails
         const orderEmailsHandler = this.createOrderEmailsFunction();
 
-        // create a lambda function for billing
         const billingHandler = this.createBillingFunction();
 
         this.addPolicyToLambdaFunction(orderEventsHandler, props);
 
-        // grant the product lambda function read access to the DynamoDB table
         props.productsDdb.grantReadData(this.handler);
 
-        // grant the order lambda function read/write access to the DynamoDB table
         ordersDdb.grantReadWriteData(this.handler);
 
-        // grant the order lambda function publish access to the SNS topic
         ordersTopic.grantPublish(this.handler);
 
-        // add a subscription to the SNS topic for the order events lambda function
         ordersTopic.addSubscription(new subs.LambdaSubscription(orderEventsHandler));
 
-        // add a subscription to the SNS topic for the billing lambda function
         ordersTopic.addSubscription(new subs.LambdaSubscription(billingHandler, {
             filterPolicy: {
                 eventType: sns.SubscriptionFilter.stringFilter({
@@ -61,9 +50,8 @@ export class OrdersApplicationStack extends cdk.Stack {
             },
         }));
 
-        const orderEventsQueue = this.createOrderEventsQueue(); // create an SQS queue
+        const orderEventsQueue = this.createOrderEventsQueue();
 
-        // add a subscription to the SNS topic for the SQS queue
         ordersTopic.addSubscription(new subs.SqsSubscription(orderEventsQueue, {
             filterPolicy: {
                 eventType: sns.SubscriptionFilter.stringFilter({
@@ -72,7 +60,6 @@ export class OrdersApplicationStack extends cdk.Stack {
             },
         }));
 
-        // Configure the order events lambda function as an event source for the SQS queue
         orderEmailsHandler.addEventSource(new lambdaEventSource.SqsEventSource(orderEventsQueue, {
                 batchSize: 5,
                 enabled: true,
@@ -82,7 +69,6 @@ export class OrdersApplicationStack extends cdk.Stack {
     }
 
     createDynamoDBTable(): dynamodb.Table {
-        // create a DynamoDB table
         return new dynamodb.Table(this, "OrdersDdb", {
             tableName: "orders",
             removalPolicy: cdk.RemovalPolicy.DESTROY,

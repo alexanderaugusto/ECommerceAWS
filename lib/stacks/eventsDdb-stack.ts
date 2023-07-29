@@ -12,22 +12,22 @@ export class EventsDdbStack extends cdk.Stack {
     }
 
     createDynamoDBTable(): dynamodb.Table {
-        // create a DynamoDB table
+
         const eventsDdb = new dynamodb.Table(this, "EventsDdb", {
-            tableName: "events", // name of the DynamoDB table at AWS
-            removalPolicy: cdk.RemovalPolicy.DESTROY, // remove the DynamoDB table when the stack is deleted
-            partitionKey: { // partition key of the DynamoDB table
-                name: "pk", // name of the partition key
-                type: dynamodb.AttributeType.STRING, // type of the partition key
+            tableName: "events",
+            removalPolicy: cdk.RemovalPolicy.DESTROY,
+            partitionKey: {
+                name: "pk",
+                type: dynamodb.AttributeType.STRING,
             },
-            sortKey: { // sort key of the DynamoDB table
-                name: "sk", // name of the sort key
-                type: dynamodb.AttributeType.STRING, // type of the sort key
+            sortKey: {
+                name: "sk",
+                type: dynamodb.AttributeType.STRING,
             },
-            timeToLiveAttribute: "ttl", // name of the TTL attribute
-            billingMode: dynamodb.BillingMode.PROVISIONED, // pay for the provisioned throughput
-            readCapacity: 1, // read capacity units
-            writeCapacity: 1, // write capacity units
+            timeToLiveAttribute: "ttl",
+            billingMode: dynamodb.BillingMode.PROVISIONED,
+            readCapacity: 1,
+            writeCapacity: 1,
         });
 
         return eventsDdb;
