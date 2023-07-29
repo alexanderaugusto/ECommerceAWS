@@ -9,10 +9,11 @@ export class EventsDdbStack extends cdk.Stack {
         super(scope, id, props);
 
         this.table = this.createDynamoDBTable();
+
+        this.enableAutoScaling(this.table);
     }
 
     createDynamoDBTable(): dynamodb.Table {
-
         const eventsDdb = new dynamodb.Table(this, "EventsDdb", {
             tableName: "events",
             removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -31,5 +32,29 @@ export class EventsDdbStack extends cdk.Stack {
         });
 
         return eventsDdb;
+    }
+
+    enableAutoScaling(table: dynamodb.Table): void {
+        const readScale = table.autoScaleReadCapacity({
+            maxCapacity: 4,
+            minCapacity: 1,
+        });
+
+        readScale.scaleOnUtilization({
+            targetUtilizationPercent: 50,
+            scaleInCooldown: cdk.Duration.seconds(60),
+            scaleOutCooldown: cdk.Duration.seconds(60),
+        });
+
+        const writeScale = table.autoScaleWriteCapacity({
+            maxCapacity: 4,
+            minCapacity: 1,
+        });
+
+        writeScale.scaleOnUtilization({
+            targetUtilizationPercent: 50,
+            scaleInCooldown: cdk.Duration.seconds(60),
+            scaleOutCooldown: cdk.Duration.seconds(60),
+        });
     }
 }
